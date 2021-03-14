@@ -1,3 +1,4 @@
+import re
 import openpyxl
 import xlrd
 import pandas as pd
@@ -20,4 +21,6 @@ def map_file(path: str, sheet: str, skip_rows: str, map_config: dict) -> pd.Data
     for result_col in result_data:
         result_data[result_col] = compute_column_value(map_config[result_col], excel_data)
 
-    return result_data
+    clean_expr = re.compile(r'[\s\n]+')
+
+    return result_data.applymap(lambda x: clean_expr.sub(' ', x).strip())
