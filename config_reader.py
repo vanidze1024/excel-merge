@@ -1,48 +1,26 @@
-import sys
-import json
 import re
+import openpyxl
+import xlrd
+import pandas as pd
 
 
-def read(config_name: str) -> list:
+def read_xls(path: str) -> pd.DataFrame:
     print('Проверка конфигурации...')
+    config_data = pd.read_excel(path,
+                                header=None,
+                                engine=None)
 
-    try:
-        with open(config_name, encoding='utf-8') as config_file:
-
-            json_config = json.load(config_file)
-            json_config = list([json_config]) if not isinstance(json_config, list) else json_config
-
-            for config in json_config:
-                _validate_config(config)
-
-            _validate_map(json_config)
-
-            return json_config
-    except FileNotFoundError:
-        sys.exit(f'Отсутствует файл {config_name}')
-    except json.decoder.JSONDecodeError:
-        sys.exit(f'Неверный формат данных в файле {config_name}')
-    except Exception as e:
-        sys.exit(e.args)
+    config_data_transposed = config_data.drop([0], axis=1).T
+    config_data_transposed = config_data_transposed.rename(columns={x: y for x, y in zip(config_data_transposed.columns,
+                                                                                         config_data[0])})
+    config_data_transposed.apply(_validate_config, axis=1)
+    return config_data_transposed
 
 
-def _validate_config(config: dict):
-    if 'path' not in config:
+def _validate_config(config: pd.Series):
+    if not hasattr(config, 'path'):
         raise Exception('В конфигурации отсутствует обязятельный параметр path')
-    if not re.search(r'\.xls$|\.xlsx$', config['path'], re.IGNORECASE | re.VERBOSE):
+    if not re.search(r'\.xls$|\.xlsx$', config.path, re.IGNORECASE | re.VERBOSE):
         raise Exception('Поддерживаются только файлы формата *.xls и *.xlsx')
-    if 'sheet' not in config:
+    if not hasattr(config, 'sheet'):
         raise Exception('В конфигурации отсутствует обязятельный параметр sheet')
-    if 'map' not in config or not isinstance(config['map'], dict):
-        raise Exception('В конфигурации отсутствует обязятельный параметр map или он задан в неверном формате')
-
-
-def _validate_map(configs: list):
-    sets = list(map(lambda x: set(x['map'].keys()), configs))
-
-    if len(sets) == 1:
-        return
-
-    for s in sets[1:]:
-        if len(s.symmetric_difference(sets[0])) > 0:
-            raise Exception('Колонки в "map" совпадают не у всех конфигураций')
